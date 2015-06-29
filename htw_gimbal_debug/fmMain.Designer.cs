@@ -49,10 +49,6 @@
             this.colY = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.colZ = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
-            this.groupBox2 = new System.Windows.Forms.GroupBox();
-            this.btnServoSTNotifyDisable = new System.Windows.Forms.Button();
-            this.btnServoSTConfig = new System.Windows.Forms.Button();
-            this.btnServoSTConnect = new System.Windows.Forms.Button();
             this.cbxServoSlaveMode = new System.Windows.Forms.CheckBox();
             this.numServoB_degree = new System.Windows.Forms.NumericUpDown();
             this.numServoA_degree = new System.Windows.Forms.NumericUpDown();
@@ -66,13 +62,16 @@
             this.listBox1 = new System.Windows.Forms.ListBox();
             this.btnServoRead = new System.Windows.Forms.Button();
             this.btnServoConnect = new System.Windows.Forms.Button();
+            this.cbxlistDevices = new System.Windows.Forms.CheckedListBox();
+            this.statusStrip1 = new System.Windows.Forms.StatusStrip();
+            this.tsslConnectedInfo = new System.Windows.Forms.ToolStripStatusLabel();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.groupBox1.SuspendLayout();
-            this.groupBox2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.numServoB_degree)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numServoA_degree)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numServoB)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.numServoA)).BeginInit();
+            this.statusStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
             // lblPorts
@@ -99,11 +98,11 @@
             // txtLog
             // 
             this.txtLog.BackColor = System.Drawing.SystemColors.Window;
-            this.txtLog.Location = new System.Drawing.Point(12, 74);
+            this.txtLog.Location = new System.Drawing.Point(12, 132);
             this.txtLog.Multiline = true;
             this.txtLog.Name = "txtLog";
             this.txtLog.ReadOnly = true;
-            this.txtLog.Size = new System.Drawing.Size(541, 223);
+            this.txtLog.Size = new System.Drawing.Size(541, 165);
             this.txtLog.TabIndex = 3;
             // 
             // btnReset
@@ -271,7 +270,6 @@
             // 
             // groupBox1
             // 
-            this.groupBox1.Controls.Add(this.groupBox2);
             this.groupBox1.Controls.Add(this.cbxServoSlaveMode);
             this.groupBox1.Controls.Add(this.numServoB_degree);
             this.groupBox1.Controls.Add(this.numServoA_degree);
@@ -291,48 +289,6 @@
             this.groupBox1.TabIndex = 17;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "BLE Servo Control...";
-            // 
-            // groupBox2
-            // 
-            this.groupBox2.Controls.Add(this.btnServoSTNotifyDisable);
-            this.groupBox2.Controls.Add(this.btnServoSTConfig);
-            this.groupBox2.Controls.Add(this.btnServoSTConnect);
-            this.groupBox2.Location = new System.Drawing.Point(549, 19);
-            this.groupBox2.Name = "groupBox2";
-            this.groupBox2.Size = new System.Drawing.Size(304, 198);
-            this.groupBox2.TabIndex = 13;
-            this.groupBox2.TabStop = false;
-            this.groupBox2.Text = "groupBox2";
-            // 
-            // btnServoSTNotifyDisable
-            // 
-            this.btnServoSTNotifyDisable.Location = new System.Drawing.Point(112, 55);
-            this.btnServoSTNotifyDisable.Name = "btnServoSTNotifyDisable";
-            this.btnServoSTNotifyDisable.Size = new System.Drawing.Size(110, 23);
-            this.btnServoSTNotifyDisable.TabIndex = 18;
-            this.btnServoSTNotifyDisable.Text = "disable notify";
-            this.btnServoSTNotifyDisable.UseVisualStyleBackColor = true;
-            this.btnServoSTNotifyDisable.Click += new System.EventHandler(this.btnServoSTNotifyDisable_Click);
-            // 
-            // btnServoSTConfig
-            // 
-            this.btnServoSTConfig.Location = new System.Drawing.Point(6, 55);
-            this.btnServoSTConfig.Name = "btnServoSTConfig";
-            this.btnServoSTConfig.Size = new System.Drawing.Size(100, 23);
-            this.btnServoSTConfig.TabIndex = 2;
-            this.btnServoSTConfig.Text = "cfg SensorTag";
-            this.btnServoSTConfig.UseVisualStyleBackColor = true;
-            this.btnServoSTConfig.Click += new System.EventHandler(this.btnServoSTConfig_Click);
-            // 
-            // btnServoSTConnect
-            // 
-            this.btnServoSTConnect.Location = new System.Drawing.Point(6, 19);
-            this.btnServoSTConnect.Name = "btnServoSTConnect";
-            this.btnServoSTConnect.Size = new System.Drawing.Size(100, 23);
-            this.btnServoSTConnect.TabIndex = 1;
-            this.btnServoSTConnect.Text = "Connect Servo";
-            this.btnServoSTConnect.UseVisualStyleBackColor = true;
-            this.btnServoSTConnect.Click += new System.EventHandler(this.btnServoSTConnect_Click);
             // 
             // cbxServoSlaveMode
             // 
@@ -397,7 +353,6 @@
             this.cbxServoAutoSet.TabIndex = 9;
             this.cbxServoAutoSet.Text = "Autoset";
             this.cbxServoAutoSet.UseVisualStyleBackColor = true;
-            this.cbxServoAutoSet.CheckedChanged += new System.EventHandler(this.cbxServoAutoSet_CheckedChanged);
             // 
             // btnServoSetValues
             // 
@@ -417,7 +372,6 @@
             this.btnServoCright.TabIndex = 7;
             this.btnServoCright.Text = "Right";
             this.btnServoCright.UseVisualStyleBackColor = true;
-            this.btnServoCright.Click += new System.EventHandler(this.btnServoCright_Click);
             // 
             // btnServoCstop
             // 
@@ -427,7 +381,6 @@
             this.btnServoCstop.TabIndex = 6;
             this.btnServoCstop.Text = "Stop";
             this.btnServoCstop.UseVisualStyleBackColor = true;
-            this.btnServoCstop.Click += new System.EventHandler(this.btnServoCstop_Click);
             // 
             // btnServoCleft
             // 
@@ -437,7 +390,6 @@
             this.btnServoCleft.TabIndex = 5;
             this.btnServoCleft.Text = "Left";
             this.btnServoCleft.UseVisualStyleBackColor = true;
-            this.btnServoCleft.Click += new System.EventHandler(this.btnServoCleft_Click);
             // 
             // numServoB
             // 
@@ -460,7 +412,6 @@
             0,
             0,
             0});
-            this.numServoB.ValueChanged += new System.EventHandler(this.numServoB_ValueChanged);
             // 
             // numServoA
             // 
@@ -483,7 +434,6 @@
             0,
             0,
             0});
-            this.numServoA.ValueChanged += new System.EventHandler(this.numServoA_ValueChanged);
             // 
             // listBox1
             // 
@@ -511,13 +461,39 @@
             this.btnServoConnect.TabIndex = 0;
             this.btnServoConnect.Text = "Connect Servo";
             this.btnServoConnect.UseVisualStyleBackColor = true;
-            this.btnServoConnect.Click += new System.EventHandler(this.btnServoConnect_Click);
+            // 
+            // cbxlistDevices
+            // 
+            this.cbxlistDevices.FormattingEnabled = true;
+            this.cbxlistDevices.Location = new System.Drawing.Point(12, 38);
+            this.cbxlistDevices.Name = "cbxlistDevices";
+            this.cbxlistDevices.Size = new System.Drawing.Size(238, 79);
+            this.cbxlistDevices.TabIndex = 14;
+            this.cbxlistDevices.SelectedIndexChanged += new System.EventHandler(this.cbxlistDevices_SelectedIndexChanged);
+            // 
+            // statusStrip1
+            // 
+            this.statusStrip1.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.tsslConnectedInfo});
+            this.statusStrip1.Location = new System.Drawing.Point(0, 516);
+            this.statusStrip1.Name = "statusStrip1";
+            this.statusStrip1.Size = new System.Drawing.Size(1164, 22);
+            this.statusStrip1.TabIndex = 18;
+            this.statusStrip1.Text = "statusStrip1";
+            // 
+            // tsslConnectedInfo
+            // 
+            this.tsslConnectedInfo.Name = "tsslConnectedInfo";
+            this.tsslConnectedInfo.Size = new System.Drawing.Size(118, 17);
+            this.tsslConnectedInfo.Text = "toolStripStatusLabel1";
             // 
             // fmMain
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1164, 538);
+            this.Controls.Add(this.statusStrip1);
+            this.Controls.Add(this.cbxlistDevices);
             this.Controls.Add(this.groupBox1);
             this.Controls.Add(this.dataGridView1);
             this.Controls.Add(this.labLuxometer);
@@ -543,11 +519,12 @@
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
-            this.groupBox2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.numServoB_degree)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numServoA_degree)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numServoB)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.numServoA)).EndInit();
+            this.statusStrip1.ResumeLayout(false);
+            this.statusStrip1.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -589,10 +566,9 @@
         private System.Windows.Forms.NumericUpDown numServoB_degree;
         private System.Windows.Forms.NumericUpDown numServoA_degree;
         private System.Windows.Forms.CheckBox cbxServoSlaveMode;
-        private System.Windows.Forms.GroupBox groupBox2;
-        private System.Windows.Forms.Button btnServoSTConnect;
-        private System.Windows.Forms.Button btnServoSTNotifyDisable;
-        private System.Windows.Forms.Button btnServoSTConfig;
+        private System.Windows.Forms.CheckedListBox cbxlistDevices;
+        private System.Windows.Forms.StatusStrip statusStrip1;
+        private System.Windows.Forms.ToolStripStatusLabel tsslConnectedInfo;
     }
 }
 

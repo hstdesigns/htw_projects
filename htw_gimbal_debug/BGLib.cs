@@ -30,6 +30,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.IO.Ports;
 
 namespace Bluegiga {
@@ -3258,6 +3259,7 @@ namespace Bluegiga {
             if (bgapiPacketMode) 
                 sp.Write(new Byte[] { (Byte)cmd.Length }, 0, 1);
             sp.Write(cmd, 0, cmd.Length);
+            //Thread.Sleep(100);
             return 0; // no error handling yet
         }
 

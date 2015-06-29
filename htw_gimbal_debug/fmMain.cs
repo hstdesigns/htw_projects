@@ -46,6 +46,18 @@ namespace htw_gimbal_debug
 
         private void fmMain_Load(object sender, EventArgs e)
         {
+
+            List<string> sl = new List<string>();
+
+            
+            sl.Add("cc");
+            sl.Add("aa");
+            sl.Add("aa");
+            sl.Add("aa");
+            sl = sl.OrderBy(x => x).ToList();
+            sl = sl.Distinct().ToList();
+
+
             // initialize list of ports
             btnRefresh_Click(sender, e);
 
@@ -60,7 +72,7 @@ namespace htw_gimbal_debug
             sp.DataBits = 8;
             sp.StopBits = System.IO.Ports.StopBits.One;
             sp.Parity = System.IO.Ports.Parity.None;
-            sp.ReadTimeout = 10;
+            sp.ReadTimeout = 100;
             sp.DataReceived += new System.IO.Ports.SerialDataReceivedEventHandler(DataReceivedHandler);
 
             // initialize BGLib events we'll need for this script
@@ -91,6 +103,8 @@ namespace htw_gimbal_debug
             myTimer.Start();
         }
 
+        Dictionary<string, string> dicmac = new Dictionary<string, string>();
+
         // for master/scanner devices, the "gap_scan_response" event is a common entry-like point
         // this filters ad packets to find devices which advertise the Health Thermometer service
         public void GAPScanResponseEvent(object sender, Bluegiga.BLE.Events.GAP.ScanResponseEventArgs e)
@@ -105,6 +119,24 @@ namespace htw_gimbal_debug
                 );
             Console.Write(log);
             ThreadSafeDelegate(delegate { txtLog.AppendText(log); });
+
+            string macadr = ByteArrayToHexString(e.sender).Trim();
+            string macinfo = string.Format("Sensortag {0} RSSI: {1}", macadr.Replace(' ', ':'), e.rssi);
+
+            if (!dicmac.ContainsKey(macadr))
+            {
+                dicmac.Add(macadr, macinfo);
+            }
+            else
+            {
+                dicmac.Remove(macadr);
+                dicmac.Add(macadr, macinfo);
+            }
+
+            ThreadSafeDelegate(delegate {
+                cbxlistDevices.Items.Clear();
+                cbxlistDevices.Items.AddRange(dicmac.Values.ToArray()); 
+            });
 
             // pull all advertised service info from ad packet
             List<Byte[]> ad_services = new List<Byte[]>();
@@ -210,6 +242,12 @@ namespace htw_gimbal_debug
             }
         }
 
+        public void writeLog(string log)
+        {
+            Console.Write(log);
+            ThreadSafeDelegate(delegate { txtLog.AppendText(log); });
+        }
+
         public void ATTClientGroupFoundEvent(object sender, Bluegiga.BLE.Events.ATTClient.GroupFoundEventArgs e)
         {
             String log = String.Format("ble_evt_attclient_group_found: connection={0}, start={1}, end={2}, uuid=[ {3}]" + Environment.NewLine,
@@ -239,7 +277,7 @@ namespace htw_gimbal_debug
                 );
             Console.Write(log);
             ThreadSafeDelegate(delegate { txtLog.AppendText(log); });
-
+            
             // check for thermometer measurement characteristic
             if (e.uuid.SequenceEqual(new Byte[] { 0x1C, 0x2A }))
             {
@@ -311,13 +349,6 @@ namespace htw_gimbal_debug
             }
         }
 
-        public void UpdateGui()
-        {
-
-        }
-
-        Point3D curGyroValue;
-
         public void ATTClientAttributeValueEvent(object sender, Bluegiga.BLE.Events.ATTClient.AttributeValueEventArgs e)
         {
             String log = String.Format("ble_evt_attclient_attribute_value: connection={0}, atthandle={1}, type={2}, value=[ {3}]" + Environment.NewLine,
@@ -347,14 +378,9 @@ namespace htw_gimbal_debug
                         ThreadSafeDelegate(delegate { labBarometer.Text = st.convertBarometer(e.value).ToString("f2") + " mbar"; });
                         break;
                     case TI_Sensor_Data.Movement:
-                        byte[] buf = e.value;
-                        Point3D p3d_g = st.convertGyroscope(buf);
-                        Point3D p3d_a = st.convertAccelerometer(buf);
-                        Point3D p3d_m = st.convertMagnetometer(buf);
-
-                        curGyroValue = p3d_a;
-
-                        Point3D p3d_roll = st.mpuAccToEuler(p3d_a);
+                        Point3D p3d_g = st.convertGyroscope(e.value);
+                        Point3D p3d_a = st.convertAccelerometer(e.value);
+                        Point3D p3d_m = st.convertMagnetometer(e.value);
 
                         ThreadSafeDelegate(delegate
                         {
@@ -368,9 +394,6 @@ namespace htw_gimbal_debug
                             dataGridView1.Rows[2].Cells[2].Value = p3d_m.y.ToString("f3");
                             dataGridView1.Rows[2].Cells[3].Value = p3d_m.z.ToString("f3");
                         });
-
-                        ThreadSafeDelegate(delegate { labBarometer.Text = (p3d_roll.x).ToString("f2") + " r"; });
-                        ThreadSafeDelegate(delegate { labLuxometer.Text = (p3d_roll.y - 90.0).ToString("f2") + " p"; });
                         break;
                     case TI_Sensor_Data.Luxometer:
                         ThreadSafeDelegate(delegate { labLuxometer.Text = st.convertLuxometer(e.value).ToString("f2") + " lux"; });
@@ -378,14 +401,6 @@ namespace htw_gimbal_debug
                     default:
                         break;
                 }
-            }
-
-            if (e.connection==adrBLE112)
-            {
-                byte[] buf = e.value;
-                Console.WriteLine("PwmA: " + BitConverter.ToInt16(buf, 0));
-                Console.WriteLine("PwmB: " + BitConverter.ToInt16(buf, 2));
-                Console.WriteLine("PwmC: " + BitConverter.ToInt16(buf, 6));
             }
         }
 
@@ -480,7 +495,7 @@ namespace htw_gimbal_debug
         private void btnGo_Click(object sender, EventArgs e)
         {
             // start the scan/connect process now
-            Byte[] cmd;
+            byte[] cmd;
 
             // set scan parameters
             cmd = bglib.BLECommandGAPSetScanParameters(0xC8, 0xC8, 1); // 125ms interval, 125ms window, active scanning
@@ -555,7 +570,12 @@ namespace htw_gimbal_debug
         {
             byte[] cmd;
 
-            cmd = bglib.BLECommandGAPConnectDirect(new byte[] { 0x81, 0xe4, 0x06, 0x0b, 0xc9, 0x68 }, 0, 60, 76, 100, 0);
+            string hexString = dicmac.ElementAt(cbxlistDevices.SelectedIndex).Key.Replace(" ", "");
+            ulong num = ulong.Parse(hexString, System.Globalization.NumberStyles.AllowHexSpecifier);
+
+            byte[] macbuf = BitConverter.GetBytes(num).Take(6).Reverse().ToArray();
+
+            cmd = bglib.BLECommandGAPConnectDirect(macbuf, 0, 60, 76, 100, 0);
             bglib.SendCommand(cmd);
         }
 
@@ -570,40 +590,48 @@ namespace htw_gimbal_debug
         {
             byte[] cmd;
 
+            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 60, new byte[] { 0x00, 0x00 });
+            //bglib.SendCommand(cmd);
+
+            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 58, new byte[] { 0x00, 0x00 });
+            //bglib.SendCommand(cmd);
+
+            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 62, new byte[] { 0x64 });
+            //bglib.SendCommand(cmd);
+
+            //Thread.Sleep(1000);
+
             //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 36, new byte[] { 0x01 });
-            //bglib.SendCommand(serialAPI, cmd);
+            //bglib.SendCommand(cmd);
 
             //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 44, new byte[] { 0x01 });
-            //bglib.SendCommand(serialAPI, cmd);
+            //bglib.SendCommand(cmd);
 
             //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 52, new byte[] { 0x01 });
-            //bglib.SendCommand(serialAPI, cmd);
+            //bglib.SendCommand(cmd);
 
             cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 60, new byte[] { 0x3f, 0x00 });
             bglib.SendCommand(cmd);
 
-            Thread.Sleep(1000);
-
-            cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 62, new byte[] { 0x0a });
-            bglib.SendCommand(cmd);
-
             //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 68, new byte[] { 0x01 });
-            //bglib.SendCommand(serialAPI, cmd);
+            //bglib.SendCommand(cmd);
+
+            //Thread.Sleep(1000);
 
             //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 34, new byte[] { 0x01, 0x00 });
-            //bglib.SendCommand(serialAPI, cmd);
+            //bglib.SendCommand(cmd);
 
             //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 42, new byte[] { 0x01, 0x00 });
-            //bglib.SendCommand(serialAPI, cmd);
+            //bglib.SendCommand(cmd);
 
             //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 50, new byte[] { 0x01, 0x00 });
-            //bglib.SendCommand(serialAPI, cmd);
+            //bglib.SendCommand(cmd);
 
             cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 58, new byte[] { 0x01, 0x00 });
             bglib.SendCommand(cmd);
 
             //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 66, new byte[] { 0x01, 0x00 });
-            //bglib.SendCommand(serialAPI, cmd);
+            //bglib.SendCommand(cmd);
 
             app_state = STATE_LISTENING_MEASUREMENTS;
         }
@@ -648,20 +676,6 @@ namespace htw_gimbal_debug
 
             //cmd = bglib.BLECommandATTClientReadByHandle(adrTIUser, 65);
             //bglib.SendCommand(serialAPI, cmd);
-        }
-
-        private void btnServoConnect_Click(object sender, EventArgs e)
-        {
-            byte[] cmd;
-
-            cmd = bglib.BLECommandGAPConnectDirect(new byte[] { 0xe5, 0x00, 0x67, 0x80, 0x07, 0x00 }, 0, 60, 76, 100, 0);
-
-            cmd = bglib.BLECommandGAPConnectDirect(new byte[] { 0x2f, 0x93, 0x05, 0x80, 0x07, 0x00 }, 0, 60, 76, 100, 0);
-            bglib.SendCommand(cmd);
-
-            myTimer.Tick += new EventHandler(TimerEventProcessor);
-            myTimer.Interval = 150;
-            myTimer.Start();
         }
 
         private void btnServoRead_Click(object sender, EventArgs e)
@@ -716,38 +730,7 @@ namespace htw_gimbal_debug
         // This is the method to run when the timer is raised.
         private void TimerEventProcessor(Object myObject, EventArgs myEventArgs)
         {
-            if (cbxServoSlaveMode.Checked)
-            {
-                numServoA_degree.Value = (int)curGyroValue.x * -1;
-                numServoB_degree.Value = (int)curGyroValue.y;
-
-                if (curGyroValue.x > 40)
-                    curGyroValue.x = 40;
-                if (curGyroValue.x < -40)
-                    curGyroValue.x = -40;
-
-                if (curGyroValue.y > 40)
-                    curGyroValue.y = 40;
-                if (curGyroValue.y < -40)
-                    curGyroValue.y = -40;
-
-                numServoA.Value = 11850 + (int)curGyroValue.x * -70;
-                numServoB.Value = 11850 + (int)curGyroValue.y * 40;
-            }
-
-            if (cbxServoAutoSet.Checked)
-            {
-                if (lastServoValues.pwmA != curServoValues.pwmA || lastServoValues.pwmB != curServoValues.pwmB || lastServoValues.pwmC != curServoValues.pwmC)
-                {
-                    ServoSetValues();
-                    lastServoValues = curServoValues;
-                }
-            }            
-        }
-
-        private void btnServoCright_Click(object sender, EventArgs e)
-        {
-            curServoValues.pwmC = 12850;
+           
         }
 
         private void btnServoSetValues_Click(object sender, EventArgs e)
@@ -755,104 +738,9 @@ namespace htw_gimbal_debug
             ServoSetValues();
         }
 
-        private void btnServoCstop_Click(object sender, EventArgs e)
+        private void cbxlistDevices_SelectedIndexChanged(object sender, EventArgs e)
         {
-            curServoValues.pwmC = 11850;
-        }
-
-        private void btnServoCleft_Click(object sender, EventArgs e)
-        {
-            curServoValues.pwmC = 10850;
-        }
-
-        private void numServoB_ValueChanged(object sender, EventArgs e)
-        {
-            curServoValues.pwmB = (ushort)numServoB.Value;
-        }
-
-        private void numServoA_ValueChanged(object sender, EventArgs e)
-        {
-            curServoValues.pwmA = (ushort)numServoA.Value;
-        }
-
-        private void cbxServoAutoSet_CheckedChanged(object sender, EventArgs e)
-        {
-            myTimer.Enabled = cbxServoAutoSet.Checked;
-        }
-
-        private void btnServoSTConnect_Click(object sender, EventArgs e)
-        {
-            byte[] cmd;
-
-            cmd = bglib.BLECommandGAPConnectDirect(new byte[] { 0x0e, 0x93, 0x04, 0x0b, 0xc9, 0x68 }, 0, 60, 76, 100, 0);
-            bglib.SendCommand(cmd);
-        }
-
-        private void btnServoSTConfig_Click(object sender, EventArgs e)
-        {
-            byte[] cmd;
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 36, new byte[] { 0x01 });
-            //bglib.SendCommand(serialAPI, cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 44, new byte[] { 0x01 });
-            //bglib.SendCommand(serialAPI, cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 52, new byte[] { 0x01 });
-            //bglib.SendCommand(serialAPI, cmd);
-
-            cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 60, new byte[] { 0x3f, 0x00 });
-            bglib.SendCommand(cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 68, new byte[] { 0x01 });
-            //bglib.SendCommand(serialAPI, cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 34, new byte[] { 0x01, 0x00 });
-            //bglib.SendCommand(serialAPI, cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 42, new byte[] { 0x01, 0x00 });
-            //bglib.SendCommand(serialAPI, cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 50, new byte[] { 0x01, 0x00 });
-            //bglib.SendCommand(serialAPI, cmd);
-
-            cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 58, new byte[] { 0x01, 0x00 });
-            bglib.SendCommand(cmd);
-        }
-
-        private void btnServoSTNotifyDisable_Click(object sender, EventArgs e)
-        {
-            byte[] cmd;
-
-            cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 34, new byte[] { 0x00, 0x00 });
-            bglib.SendCommand(cmd);
-
-            cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 42, new byte[] { 0x00, 0x00 });
-            bglib.SendCommand(cmd);
-
-            cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 50, new byte[] { 0x00, 0x00 });
-            bglib.SendCommand(cmd);
-
-            cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 58, new byte[] { 0x00, 0x00 });
-            bglib.SendCommand(cmd);
-
-            cmd = bglib.BLECommandATTClientWriteCommand(adrTIServo, 66, new byte[] { 0x00, 0x00 });
-            bglib.SendCommand(cmd);
-
-            //cmd = bglib.BLECommandATTClientReadByHandle(adrTIServo, 33);
-            //bglib.SendCommand(serialAPI, cmd);
-
-            //cmd = bglib.BLECommandATTClientReadByHandle(adrTIServo, 41);
-            //bglib.SendCommand(serialAPI, cmd);
-
-            //cmd = bglib.BLECommandATTClientReadByHandle(adrTIServo, 49);
-            //bglib.SendCommand(serialAPI, cmd);
-
-            //cmd = bglib.BLECommandATTClientReadByHandle(adrTIServo, 57);
-            //bglib.SendCommand(serialAPI, cmd);
-
-            //cmd = bglib.BLECommandATTClientReadByHandle(adrTIServo, 65);
-            //bglib.SendCommand(serialAPI, cmd);
+            tsslConnectedInfo.Text = dicmac.ElementAt(cbxlistDevices.SelectedIndex).Value;
         }
 
     }
