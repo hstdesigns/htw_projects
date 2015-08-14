@@ -13,7 +13,7 @@ using System.IO.Ports;
 namespace htw_gimbal_debug
 {
     public partial class fmMain : Form
-    {        
+    {
         public Boolean isAttached = false;
         public Dictionary<string, string> portDict = new Dictionary<string, string>();
         public SensorTagCC2650 st = new SensorTagCC2650();
@@ -49,7 +49,7 @@ namespace htw_gimbal_debug
 
             List<string> sl = new List<string>();
 
-            
+
             sl.Add("cc");
             sl.Add("aa");
             sl.Add("aa");
@@ -91,7 +91,7 @@ namespace htw_gimbal_debug
                     btnAttach_Click(this, e);
                     continue;
                 }
-            }         
+            }
 
             //dataGridView1.Rows.Add(3);
             dataGridView1.Rows.Add(new object[] { "Accelerometer", "0", "0", "0" });
@@ -133,9 +133,14 @@ namespace htw_gimbal_debug
                 dicmac.Add(macadr, macinfo);
             }
 
-            ThreadSafeDelegate(delegate {
+            ThreadSafeDelegate(delegate
+            {
+                int selix = cbxlistDevices.SelectedIndex;
                 cbxlistDevices.Items.Clear();
-                cbxlistDevices.Items.AddRange(dicmac.Values.ToArray()); 
+                cbxlistDevices.Items.AddRange(dicmac.Values.ToArray());
+                cbxlistDevices.SelectedIndex = selix;
+                if (selix >= 0)
+                    cbxlistDevices.SetItemChecked(selix, true);
             });
 
             // pull all advertised service info from ad packet
@@ -211,6 +216,8 @@ namespace htw_gimbal_debug
             Console.Write(log);
             ThreadSafeDelegate(delegate { txtLog.AppendText(log); });
 
+            adrTIUser = e.connection;
+
             if ((e.flags & 0x05) == 0x05)
             {
                 // connected, now perform service discovery
@@ -221,21 +228,6 @@ namespace htw_gimbal_debug
                 ThreadSafeDelegate(delegate { txtLog.AppendText(String.Format("=> TX ({0}) [ {1}]", cmd.Length, ByteArrayToHexString(cmd)) + Environment.NewLine); });
                 bglib.SendCommand(cmd);
                 //while (bglib.IsBusy()) ;
-
-                switch (e.address[0])
-                {
-                    case 0x81:
-                        adrTIUser = e.connection;
-                        break;
-                    case 0x2f:
-                        adrBLE112 = e.connection;
-                        break;
-                    case 0x0e:
-                        adrTIServo = e.connection;
-                        break;
-                    default:
-                        break;
-                }
 
                 // update state
                 app_state = STATE_FINDING_SERVICES;
@@ -277,7 +269,7 @@ namespace htw_gimbal_debug
                 );
             Console.Write(log);
             ThreadSafeDelegate(delegate { txtLog.AppendText(log); });
-            
+
             // check for thermometer measurement characteristic
             if (e.uuid.SequenceEqual(new Byte[] { 0x1C, 0x2A }))
             {
@@ -349,6 +341,10 @@ namespace htw_gimbal_debug
             }
         }
 
+        public static Point3D p3d_g;
+        public static Point3D p3d_a;
+        public static Point3D p3d_m;
+
         public void ATTClientAttributeValueEvent(object sender, Bluegiga.BLE.Events.ATTClient.AttributeValueEventArgs e)
         {
             String log = String.Format("ble_evt_attclient_attribute_value: connection={0}, atthandle={1}, type={2}, value=[ {3}]" + Environment.NewLine,
@@ -378,18 +374,18 @@ namespace htw_gimbal_debug
                         ThreadSafeDelegate(delegate { labBarometer.Text = st.convertBarometer(e.value).ToString("f2") + " mbar"; });
                         break;
                     case TI_Sensor_Data.Movement:
-                        Point3D p3d_g = st.convertGyroscope(e.value);
-                        Point3D p3d_a = st.convertAccelerometer(e.value);
-                        Point3D p3d_m = st.convertMagnetometer(e.value);
+                        p3d_a = st.convertAccelerometer(e.value);
+                        p3d_g = st.convertGyroscope(e.value);
+                        p3d_m = st.convertMagnetometer(e.value);
 
                         ThreadSafeDelegate(delegate
                         {
-                            dataGridView1.Rows[0].Cells[1].Value = p3d_g.x.ToString("f3");
-                            dataGridView1.Rows[0].Cells[2].Value = p3d_g.y.ToString("f3");
-                            dataGridView1.Rows[0].Cells[3].Value = p3d_g.z.ToString("f3");
-                            dataGridView1.Rows[1].Cells[1].Value = p3d_a.x.ToString("f3");
-                            dataGridView1.Rows[1].Cells[2].Value = p3d_a.y.ToString("f3");
-                            dataGridView1.Rows[1].Cells[3].Value = p3d_a.z.ToString("f3");
+                            dataGridView1.Rows[0].Cells[1].Value = p3d_a.x.ToString("f3");
+                            dataGridView1.Rows[0].Cells[2].Value = p3d_a.y.ToString("f3");
+                            dataGridView1.Rows[0].Cells[3].Value = p3d_a.z.ToString("f3");
+                            dataGridView1.Rows[1].Cells[1].Value = p3d_g.x.ToString("f3");
+                            dataGridView1.Rows[1].Cells[2].Value = p3d_g.y.ToString("f3");
+                            dataGridView1.Rows[1].Cells[3].Value = p3d_g.z.ToString("f3");
                             dataGridView1.Rows[2].Cells[1].Value = p3d_m.x.ToString("f3");
                             dataGridView1.Rows[2].Cells[2].Value = p3d_m.y.ToString("f3");
                             dataGridView1.Rows[2].Cells[3].Value = p3d_m.z.ToString("f3");
@@ -494,28 +490,45 @@ namespace htw_gimbal_debug
 
         private void btnGo_Click(object sender, EventArgs e)
         {
-            // start the scan/connect process now
             byte[] cmd;
 
-            // set scan parameters
-            cmd = bglib.BLECommandGAPSetScanParameters(0xC8, 0xC8, 1); // 125ms interval, 125ms window, active scanning
-            // DEBUG: display bytes read
-            ThreadSafeDelegate(delegate { txtLog.AppendText(String.Format("=> TX ({0}) [ {1}]", cmd.Length, ByteArrayToHexString(cmd)) + Environment.NewLine); });
-            bglib.SendCommand(cmd);
-            //while (bglib.IsBusy()) ;
+            if (app_state == STATE_SCANNING)
+            {
+                btnGo.Enabled = false;
 
-            // begin scanning for BLE peripherals
-            cmd = bglib.BLECommandGAPDiscover(1); // generic discovery mode
-            // DEBUG: display bytes read
-            ThreadSafeDelegate(delegate { txtLog.AppendText(String.Format("=> TX ({0}) [ {1}]", cmd.Length, ByteArrayToHexString(cmd)) + Environment.NewLine); });
-            bglib.SendCommand(cmd);
-            //while (bglib.IsBusy()) ;
+                // stop scanning if scanning
+                cmd = bglib.BLECommandGAPEndProcedure();
+                ThreadSafeDelegate(delegate { txtLog.AppendText(String.Format("=> TX ({0}) [ {1}]", cmd.Length, ByteArrayToHexString(cmd)) + Environment.NewLine); });
+                bglib.SendCommand(cmd);
 
-            // update state
-            app_state = STATE_SCANNING;
+                // update state
+                app_state = STATE_STANDBY;
 
-            // disable "GO" button since we already started, and sending the same commands again sill not work right
-            btnGo.Enabled = false;
+                btnGo.Text = "start search...";
+                btnGo.Enabled = true;
+            }
+            else
+            {
+                // start the scan/connect process now            
+                btnGo.Enabled = false;
+
+                // set scan parameters
+                cmd = bglib.BLECommandGAPSetScanParameters(0xC8, 0xC8, 1); // 125ms interval, 125ms window, active scanning
+                ThreadSafeDelegate(delegate { txtLog.AppendText(String.Format("=> TX ({0}) [ {1}]", cmd.Length, ByteArrayToHexString(cmd)) + Environment.NewLine); });
+                bglib.SendCommand(cmd);
+
+                // begin scanning for BLE peripherals
+                cmd = bglib.BLECommandGAPDiscover(1); // generic discovery mode
+                ThreadSafeDelegate(delegate { txtLog.AppendText(String.Format("=> TX ({0}) [ {1}]", cmd.Length, ByteArrayToHexString(cmd)) + Environment.NewLine); });
+                bglib.SendCommand(cmd);
+
+                // update state
+                app_state = STATE_SCANNING;
+
+                // disable "GO" button since we already started, and sending the same commands again sill not work right
+                btnGo.Text = "stop search...";
+                btnGo.Enabled = true;
+            }
         }
 
         private void btnReset_Click(object sender, EventArgs e)
@@ -570,13 +583,38 @@ namespace htw_gimbal_debug
         {
             byte[] cmd;
 
-            string hexString = dicmac.ElementAt(cbxlistDevices.SelectedIndex).Key.Replace(" ", "");
-            ulong num = ulong.Parse(hexString, System.Globalization.NumberStyles.AllowHexSpecifier);
+            if (app_state == STATE_SCANNING)
+            {
+                btnGo_Click(this, e);
+                Thread.Sleep(1000);
+            }
 
-            byte[] macbuf = BitConverter.GetBytes(num).Take(6).Reverse().ToArray();
+            if (app_state == STATE_CONNECTING || app_state == STATE_LISTENING_MEASUREMENTS)
+            {
+                // disconnect if connected
+                cmd = bglib.BLECommandConnectionDisconnect(adrTIUser);
+                // DEBUG: display bytes read
+                ThreadSafeDelegate(delegate { txtLog.AppendText(String.Format("=> TX ({0}) [ {1}]", cmd.Length, ByteArrayToHexString(cmd)) + Environment.NewLine); });
+                bglib.SendCommand(cmd);
 
-            cmd = bglib.BLECommandGAPConnectDirect(macbuf, 0, 60, 76, 100, 0);
-            bglib.SendCommand(cmd);
+                Thread.Sleep(1000);
+
+                app_state = STATE_STANDBY;
+                btnSTConnect.Text="connect";
+            }
+            else
+            {
+                string hexString = dicmac.ElementAt(cbxlistDevices.SelectedIndex).Key.Replace(" ", "");
+                ulong num = ulong.Parse(hexString, System.Globalization.NumberStyles.AllowHexSpecifier);
+
+                byte[] macbuf = BitConverter.GetBytes(num).Take(6).Reverse().ToArray();
+
+                cmd = bglib.BLECommandGAPConnectDirect(macbuf, 0, 60, 76, 100, 0);
+                bglib.SendCommand(cmd);
+
+                app_state = STATE_CONNECTING;
+                btnSTConnect.Text = "disconnect";
+            }
         }
 
         /*
@@ -590,48 +628,59 @@ namespace htw_gimbal_debug
         {
             byte[] cmd;
 
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 60, new byte[] { 0x00, 0x00 });
-            //bglib.SendCommand(cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 58, new byte[] { 0x00, 0x00 });
-            //bglib.SendCommand(cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 62, new byte[] { 0x64 });
-            //bglib.SendCommand(cmd);
-
-            //Thread.Sleep(1000);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 36, new byte[] { 0x01 });
-            //bglib.SendCommand(cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 44, new byte[] { 0x01 });
-            //bglib.SendCommand(cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 52, new byte[] { 0x01 });
-            //bglib.SendCommand(cmd);
-
-            cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 60, new byte[] { 0x3f, 0x00 });
+            cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 58, new byte[] { 0x00, 0x00 });
             bglib.SendCommand(cmd);
 
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 68, new byte[] { 0x01 });
-            //bglib.SendCommand(cmd);
-
-            //Thread.Sleep(1000);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 34, new byte[] { 0x01, 0x00 });
-            //bglib.SendCommand(cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 42, new byte[] { 0x01, 0x00 });
-            //bglib.SendCommand(cmd);
-
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 50, new byte[] { 0x01, 0x00 });
-            //bglib.SendCommand(cmd);
-
-            cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 58, new byte[] { 0x01, 0x00 });
+            cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 60, new byte[] { 0x00, 0x00 });
             bglib.SendCommand(cmd);
 
-            //cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 66, new byte[] { 0x01, 0x00 });
-            //bglib.SendCommand(cmd);
+            cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 62, new byte[] { 0x14 });
+            bglib.SendCommand(cmd);
+
+            Thread.Sleep(1000);
+
+            if (cbxMotionOnly.Checked)
+            {
+                cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 60, new byte[] { 0x3f, 0x00 });
+                bglib.SendCommand(cmd);
+            }
+            else
+            {
+                cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 36, new byte[] { 0x01 });
+                bglib.SendCommand(cmd);
+
+                cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 44, new byte[] { 0x01 });
+                bglib.SendCommand(cmd);
+
+                cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 52, new byte[] { 0x01 });
+                bglib.SendCommand(cmd);
+
+                cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 68, new byte[] { 0x01 });
+                bglib.SendCommand(cmd);
+            }
+            Thread.Sleep(1000);
+
+            if (cbxMotionOnly.Checked)
+            {
+                cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 58, new byte[] { 0x01, 0x00 });
+                bglib.SendCommand(cmd);
+            }
+            else
+            {
+                cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 34, new byte[] { 0x01, 0x00 });
+                bglib.SendCommand(cmd);
+
+                cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 42, new byte[] { 0x01, 0x00 });
+                bglib.SendCommand(cmd);
+
+                cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 50, new byte[] { 0x01, 0x00 });
+                bglib.SendCommand(cmd);
+
+
+
+                cmd = bglib.BLECommandATTClientWriteCommand(adrTIUser, 66, new byte[] { 0x01, 0x00 });
+                bglib.SendCommand(cmd);
+            }
 
             app_state = STATE_LISTENING_MEASUREMENTS;
         }
@@ -730,7 +779,7 @@ namespace htw_gimbal_debug
         // This is the method to run when the timer is raised.
         private void TimerEventProcessor(Object myObject, EventArgs myEventArgs)
         {
-           
+
         }
 
         private void btnServoSetValues_Click(object sender, EventArgs e)
@@ -741,6 +790,17 @@ namespace htw_gimbal_debug
         private void cbxlistDevices_SelectedIndexChanged(object sender, EventArgs e)
         {
             tsslConnectedInfo.Text = dicmac.ElementAt(cbxlistDevices.SelectedIndex).Value;
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            // Show 3D cuboid forms
+            Console.WriteLine("Showing 3D Cuboid forms...");
+            Form_3Dcuboid form_3DcuboidA = new Form_3Dcuboid();
+            form_3DcuboidA.Text += " A";
+            BackgroundWorker backgroundWorkerA = new BackgroundWorker();
+            backgroundWorkerA.DoWork += new DoWorkEventHandler(delegate { form_3DcuboidA.ShowDialog(); });
+            backgroundWorkerA.RunWorkerAsync();
         }
 
     }

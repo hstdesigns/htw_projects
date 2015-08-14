@@ -75,28 +75,28 @@ namespace htw_gimbal_debug
             // to the user guide, but the iOS code doesn't bother. It should
             // have minimal impact.
             a = a - (a % 4);
-            return (-6f) + 125f * (a / 65535f);
+            return (-6.0) + 125.0 * (a / 65535.0);
         }
 
         public double convertBarometer(byte[] value)
         {
-            int mantissa;
-            int exponent;
-            int sfloat = BitConverter.ToUInt16(value, 2);
+            uint mantissa;
+            uint exponent;
+            uint sfloat = BitConverter.ToUInt16(value, 2);
 
             mantissa = sfloat & 0x0FFF;
             exponent = (sfloat >> 12) & 0xFF;
 
             double output;
-            double magnitude = Math.Pow(2.0f, exponent);
-            output = (mantissa * magnitude);
+            double magnitude = Math.Pow(2.0, exponent);
+            output = mantissa * magnitude;
 
-            return output / 10000.0f;
+            return output / 10000.0;
         }
 
-        public Point3D convertGyroscope(byte[] value)
+        public Point3D convertGyroscopeX(byte[] value)
         {
-            double coeff = 2f / 32768f;
+            double coeff = 2.0 / 32768.0;
 
             double x = BitConverter.ToInt16(value, 0) * coeff;
             double y = BitConverter.ToInt16(value, 2) * coeff;
@@ -105,11 +105,13 @@ namespace htw_gimbal_debug
             return new Point3D(x, y, z);
         }
 
-        public Point3D convertGyroscopeX(byte[] value)
+        public Point3D convertGyroscope(byte[] value)
         {
-            float y = BitConverter.ToInt16(value, 0) * (500f / 65536f) * -1;
-            float x = BitConverter.ToInt16(value, 2) * (500f / 65536f);
-            float z = BitConverter.ToInt16(value, 4) * (500f / 65536f);
+            double coeff = 500.0 / 65536.0;
+
+            double y = BitConverter.ToInt16(value, 0) * coeff;
+            double x = BitConverter.ToInt16(value, 2) * coeff;
+            double z = BitConverter.ToInt16(value, 4) * coeff;
 
             return new Point3D(x, y, z);
         }
@@ -124,42 +126,19 @@ namespace htw_gimbal_debug
              * image)
              */
 
-            // Range 8G
+            // Range 2G
+            double SCALE = 4096.0 * 4.0;
 
             value = value.Skip(6).ToArray();
 
-            double coeff = 180f / 32768f;
-
-            double x = BitConverter.ToInt16(value, 0) * coeff;
-            double y = BitConverter.ToInt16(value, 2) * coeff;
-            double z = BitConverter.ToInt16(value, 4) * coeff;
+            double x = BitConverter.ToInt16(value, 0) / SCALE;
+            double y = BitConverter.ToInt16(value, 2) / SCALE;
+            double z = BitConverter.ToInt16(value, 4) / SCALE;
 
             return new Point3D(x, y, z);
         }
 
         double roll, pitch;
-
-        public Point3D convertAccelerometerX(byte[] value)
-        {
-            /*
-             * The accelerometer has the range [-2g, 2g] with unit (1/64)g.
-             * To convert from unit (1/64)g to unit g we divide by 64.
-             * (g = 9.81 m/s^2)
-             * The z value is multiplied with -1 to coincide with how we have arbitrarily defined the positive y direction. (illustrated by the apps accelerometer
-             * image)
-             */
-
-            // Range 8G
-            double SCALE = 4096.0;
-
-            value = value.Skip(6).ToArray();
-
-            int X = (value[0] << 8) + value[1];
-            int Y = (value[2] << 8) + value[3];
-            int Z = (value[4] << 8) + value[5];
-
-            return new Point3D(X / SCALE, Y / SCALE, Z / SCALE);
-        }
 
         public Point3D mpuAccToEuler(Point3D acc)
         {
@@ -173,7 +152,7 @@ namespace htw_gimbal_debug
             return new Point3D(roll, pitch, 0.0);
         }
 
-        public Point3D convertMagnetometer(byte[] value)
+        public Point3D convertMagnetometerX(byte[] value)
         {
             //Point3D mcal = MagnetometerCalibrationCoefficients.INSTANCE.val;
             // Multiply x and y with -1 so that the values correspond with the image in the app
@@ -189,15 +168,17 @@ namespace htw_gimbal_debug
             return new Point3D(x, y, z);
         }
 
-        public Point3D convertMagnetometerX(byte[] value)
+        public Point3D convertMagnetometer(byte[] value)
         {
             //Point3D mcal = MagnetometerCalibrationCoefficients.INSTANCE.val;
             // Multiply x and y with -1 so that the values correspond with the image in the app
             value = value.Skip(12).ToArray();
 
-            float x = BitConverter.ToInt16(value, 0) * (2000f / 65536f) * -1;
-            float y = BitConverter.ToInt16(value, 2) * (2000f / 65536f) * -1;
-            float z = BitConverter.ToInt16(value, 4) * (2000f / 65536f);
+            double coeff = 2000.0 / 65536.0;
+
+            double x = BitConverter.ToInt16(value, 0) * coeff;
+            double y = BitConverter.ToInt16(value, 2) * coeff;
+            double z = BitConverter.ToInt16(value, 4) * coeff;
 
             //return new Point3D(x - mcal.x, y - mcal.y, z - mcal.z);
             return new Point3D(x, y, z);
@@ -213,10 +194,10 @@ namespace htw_gimbal_debug
             exponent = (sfloat >> 12) & 0xFF;
 
             double output;
-            double magnitude = Math.Pow(2.0f, exponent);
+            double magnitude = Math.Pow(2.0, exponent);
             output = (mantissa * magnitude);
 
-            return output / 100.0f;
+            return output / 100.0;
         }
     }
 }
